@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_fiscal_year_close_manager,Cierre Ejercicio: Responsable,model_aerotec_fiscal_year_close,aerotec_fiscal_year_close.group_fiscal_year_closer,1,1,1,1
+access_fiscal_year_close_account_manager,Cierre Ejercicio: Administrador Contabilidad,model_aerotec_fiscal_year_close,account.group_account_manager,1,1,1,1
 access_fiscal_year_close_user,Cierre Ejercicio: Contable,model_aerotec_fiscal_year_close,account.group_account_user,1,0,0,0
