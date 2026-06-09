@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         List view
+    ============================================================ -->
+    <record id="view_fiscal_year_close_list" model="ir.ui.view">
+        <field name="name">aerotec.fiscal.year.close.list</field>
+        <field name="model">aerotec.fiscal.year.close</field>
+        <field name="arch" type="xml">
+            <list string="Cierres de Ejercicio" decoration-success="state == 'closed'" decoration-muted="state == 'draft'">
+                <field name="name"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="closing_journal_id"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'closed'"
+                       decoration-warning="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Form view
+    ============================================================ -->
+    <record id="view_fiscal_year_close_form" model="ir.ui.view">
+        <field name="name">aerotec.fiscal.year.close.form</field>
+        <field name="model">aerotec.fiscal.year.close</field>
+        <field name="arch" type="xml">
+            <form string="Cierre de Ejercicio">
+                <header>
+                    <button name="action_close"
+                            string="Ejecutar Cierre"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"
+                            groups="aerotec_fiscal_year_close.group_fiscal_year_closer"
+                            confirm="¿Está seguro de ejecutar el cierre del ejercicio? Esta operación creará los asientos de cierre y bloqueará el período contable."/>
+                    <button name="action_reverse"
+                            string="Revertir Cierre"
+                            type="object"
+                            class="btn-danger"
+                            invisible="state != 'closed'"
+                            groups="aerotec_fiscal_year_close.group_fiscal_year_closer"
+                            confirm="¿Está seguro de revertir el cierre? Se eliminarán los asientos de cierre y se desbloqueará el período contable."/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Ejercicio">
+                            <field name="company_id"
+                                   readonly="state == 'closed'"
+                                   groups="base.group_multi_company"/>
+                            <field name="date_from" readonly="state == 'closed'"/>
+                            <field name="date_to" readonly="state == 'closed'"/>
+                        </group>
+                        <group string="Configuración">
+                            <field name="closing_journal_id"
+                                   readonly="state == 'closed'"
+                                   domain="[('type', '=', 'general'), ('company_id', '=', company_id)]"/>
+                            <field name="result_account_id"
+                                   readonly="state == 'closed'"
+                                   domain="[('code', '=like', '3%'), ('company_ids', 'in', [company_id]), ('deprecated', '=', False)]"/>
+                        </group>
+                    </group>
+                    <group string="Asientos Generados" invisible="state == 'draft'">
+                        <field name="result_move_id" readonly="1"/>
+                        <field name="balance_move_id" readonly="1"/>
+                        <field name="opening_move_id" readonly="1"/>
+                    </group>
+                    <field name="notes" placeholder="Notas opcionales sobre este cierre..."/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Search view
+    ============================================================ -->
+    <record id="view_fiscal_year_close_search" model="ir.ui.view">
+        <field name="name">aerotec.fiscal.year.close.search</field>
+        <field name="model">aerotec.fiscal.year.close</field>
+        <field name="arch" type="xml">
+            <search string="Cierres de Ejercicio">
+                <field name="name"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <separator/>
+                <filter name="filter_draft" string="Borrador" domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_closed" string="Cerrado" domain="[('state', '=', 'closed')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_company" string="Empresa" context="{'group_by': 'company_id'}"/>
+                    <filter name="group_state" string="Estado" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Action
+    ============================================================ -->
+    <record id="action_fiscal_year_close" model="ir.actions.act_window">
+        <field name="name">Cierres de Ejercicio</field>
+        <field name="res_model">aerotec.fiscal.year.close</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_draft': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Crear el primer cierre de ejercicio
+            </p>
+            <p>
+                Gestione los cierres anuales de ejercicio contable.
+                El proceso genera automáticamente los asientos de cierre de resultados,
+                refundición de balance y apertura del ejercicio siguiente.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_fiscal_year_close" model="ir.ui.view">
+        <field name="name">res.config.settings.view.fiscal.year.close</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='default_accounts']" position="inside">
+                <setting string="Diario de Cierre" company_dependent="1"
+                         help="Diario utilizado para los asientos de cierre y apertura del ejercicio contable."
+                         groups="account.group_account_manager">
+                    <field name="closing_journal_id"
+                           domain="[('type', '=', 'general'), ('company_id', '=', current_company_id)]"/>
+                </setting>
+                <setting string="Prefijos: Cuentas de Resultado" company_dependent="1"
+                         help="Prefijos del código contable para cuentas de resultado (ingresos/egresos). Separados por coma. Ejemplo: 4,5"
+                         groups="account.group_account_manager">
+                    <field name="closing_result_prefixes" placeholder="4,5"/>
+                </setting>
+                <setting string="Prefijos: Cuentas de Balance" company_dependent="1"
+                         help="Prefijos del código contable para cuentas de activo, pasivo y patrimonio neto. Separados por coma. Ejemplo: 1,2,3"
+                         groups="account.group_account_manager">
+                    <field name="closing_balance_prefixes" placeholder="1,2,3"/>
+                </setting>
+                <setting string="Cuenta Resultados del Ejercicio" company_dependent="1"
+                         help="Cuenta patrimonial (3.x) donde se acumula el resultado al cierre del ejercicio."
+                         groups="account.group_account_manager">
+                    <field name="fiscal_year_result_account_id"
+                           domain="[('code', '=like', '3%'), ('company_ids', 'in', [current_company_id]), ('deprecated', '=', False)]"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

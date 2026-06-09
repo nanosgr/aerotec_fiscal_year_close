@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="seq_fiscal_year_close" model="ir.sequence">
+        <field name="name">Cierre de Ejercicio</field>
+        <field name="code">aerotec.fiscal.year.close</field>
+        <field name="prefix">CIERRE/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

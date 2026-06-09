@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_fiscal_year_close"
+        name="Cierre de Ejercicio"
+        parent="account.menu_finance_entries"
+        action="action_fiscal_year_close"
+        sequence="100"
+        groups="aerotec_fiscal_year_close.group_fiscal_year_closer"/>
+</odoo>
