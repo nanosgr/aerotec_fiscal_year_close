@@ -34,14 +34,14 @@
                             type="object"
                             class="btn-primary"
                             invisible="state != 'draft'"
-                            groups="aerotec_fiscal_year_close.group_fiscal_year_closer"
+                            groups="aerotec_fiscal_year_close.group_fiscal_year_closer,account.group_account_manager"
                             confirm="¿Está seguro de ejecutar el cierre del ejercicio? Esta operación creará los asientos de cierre y bloqueará el período contable."/>
                     <button name="action_reverse"
                             string="Revertir Cierre"
                             type="object"
                             class="btn-danger"
                             invisible="state != 'closed'"
-                            groups="aerotec_fiscal_year_close.group_fiscal_year_closer"
+                            groups="aerotec_fiscal_year_close.group_fiscal_year_closer,account.group_account_manager"
                             confirm="¿Está seguro de revertir el cierre? Se eliminarán los asientos de cierre y se desbloqueará el período contable."/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,closed"/>
                 </header>
