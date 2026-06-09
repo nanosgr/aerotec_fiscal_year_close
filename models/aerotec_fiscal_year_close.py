@@ -12,6 +12,7 @@ class AerotecFiscalYearClose(models.Model):
     _description = "Cierre de Ejercicio Contable"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "date_to desc, company_id, id desc"
+    _check_company_auto = True
 
     name = fields.Char(
         string="Referencia",

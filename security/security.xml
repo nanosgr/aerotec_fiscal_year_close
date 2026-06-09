@@ -4,4 +4,11 @@
         <field name="name">Cierre de Ejercicio: Responsable</field>
         <field name="category_id" ref="base.module_category_accounting_accounting"/>
     </record>
+
+    <record id="rule_fiscal_year_close_company" model="ir.rule">
+        <field name="name">Cierre Ejercicio: solo empresa activa</field>
+        <field name="model_id" ref="model_aerotec_fiscal_year_close"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
 </odoo>
