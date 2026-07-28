@@ -1,6 +1,6 @@
 {
     "name": "Aerotec - Cierre de Ejercicios Contables",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Accounting/Accounting",
     "summary": "Gestión del cierre de ejercicios contables en esquema multiempresa",
     "author": "Sebastian Rios",
