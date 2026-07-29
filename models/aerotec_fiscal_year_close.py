@@ -118,9 +118,15 @@ class AerotecFiscalYearClose(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get("name", "Nuevo") == "Nuevo":
-                vals["name"] = self.env["ir.sequence"].next_by_code(
-                    "aerotec.fiscal.year.close"
-                ) or "Nuevo"
+                # La secuencia no usa "use_date_range", por lo que el
+                # parámetro sequence_date de next_by_code no tiene efecto
+                # sobre el %(year)s del prefijo: hay que fijarlo vía contexto.
+                vals["name"] = (
+                    self.env["ir.sequence"]
+                    .with_context(ir_sequence_date=vals.get("date_to"))
+                    .next_by_code("aerotec.fiscal.year.close")
+                    or "Nuevo"
+                )
         return super().create(vals_list)
 
     @api.onchange("company_id")
@@ -410,7 +416,16 @@ class AerotecFiscalYearClose(models.Model):
     def _get_prefixes(self, field_name, fallback):
         """Devuelve la lista de prefijos configurados en la empresa para el campo indicado."""
         raw = getattr(self.company_id, field_name, None) or fallback
-        return [p.strip() for p in raw.split(",") if p.strip()]
+        prefixes = [p.strip() for p in raw.split(",") if p.strip()]
+        if not prefixes:
+            # Si la configuración queda vacía (p.ej. sólo comas/espacios), no se
+            # debe continuar sin filtro: eso incluiría cuentas de cualquier tipo
+            # (activo, pasivo, patrimonio) en el asiento de cierre.
+            raise UserError(
+                _("La configuración de prefijos de cuentas (%s) es inválida para %s.")
+                % (field_name, self.company_id.name)
+            )
+        return prefixes
 
     def _get_account_balances_by_prefix(self, prefixes, date_from, date_to):
         """
@@ -437,10 +452,14 @@ class AerotecFiscalYearClose(models.Model):
                 prefix_domain.append(("account_id.code", "=like", prefix + "%"))
             domain = domain + prefix_domain
 
-        groups = self.env["account.move.line"]._read_group(
-            domain=domain,
-            groupby=["account_id"],
-            aggregates=["debit:sum", "credit:sum"],
+        groups = (
+            self.env["account.move.line"]
+            .with_company(self.company_id)
+            ._read_group(
+                domain=domain,
+                groupby=["account_id"],
+                aggregates=["debit:sum", "credit:sum"],
+            )
         )
         result = {}
         for account, debit_sum, credit_sum in groups:
