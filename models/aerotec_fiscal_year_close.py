@@ -494,7 +494,16 @@ class AerotecFiscalYearClose(models.Model):
             "journal_id": self.closing_journal_id.id,
             "company_id": self.company_id.id,
             "move_type": "entry",
-            "line_ids": [(0, 0, line) for line in lines],
+            "line_ids": [
+                # Si la cuenta tiene impuestos por defecto configurados,
+                # account.move.line._compute_tax_ids los aplica solos al no
+                # recibir tax_ids explícito, generando una línea de IVA extra
+                # y el consiguiente "Balance automático de línea" para
+                # cuadrar el asiento. Los asientos de cierre nunca deben
+                # llevar impuestos, así que se fuerza vacío.
+                (0, 0, {**line, "tax_ids": [(6, 0, [])]})
+                for line in lines
+            ],
         }
         move = self.env["account.move"].with_company(self.company_id).create(move_vals)
         move.action_post()
