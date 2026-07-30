@@ -12,16 +12,6 @@
                     <field name="closing_journal_id"
                            domain="[('type', '=', 'general'), ('company_id', '=', current_company_id)]"/>
                 </setting>
-                <setting string="Prefijos: Cuentas de Resultado" company_dependent="1"
-                         help="Prefijos del código contable para cuentas de resultado (ingresos/egresos). Separados por coma. Ejemplo: 4,5"
-                         groups="account.group_account_manager">
-                    <field name="closing_result_prefixes" placeholder="4,5"/>
-                </setting>
-                <setting string="Prefijos: Cuentas de Balance" company_dependent="1"
-                         help="Prefijos del código contable para cuentas de activo, pasivo y patrimonio neto. Separados por coma. Ejemplo: 1,2,3"
-                         groups="account.group_account_manager">
-                    <field name="closing_balance_prefixes" placeholder="1,2,3"/>
-                </setting>
                 <setting string="Cuenta Resultados del Ejercicio" company_dependent="1"
                          help="Cuenta patrimonial (3.x) donde se acumula el resultado al cierre del ejercicio."
                          groups="account.group_account_manager">

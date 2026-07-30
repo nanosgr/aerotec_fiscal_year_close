@@ -6,6 +6,33 @@ from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
+# Tipos de cuenta contable (account.account.account_type) que se consideran
+# de resultado (ingresos/egresos) a efectos del cierre.
+RESULT_ACCOUNT_TYPES = (
+    "income",
+    "income_other",
+    "expense",
+    "expense_depreciation",
+    "expense_direct_cost",
+)
+
+# Tipos de cuenta contable que se consideran patrimoniales (activo, pasivo y
+# patrimonio neto) a efectos de la refundición de balance.
+BALANCE_ACCOUNT_TYPES = (
+    "asset_receivable",
+    "asset_cash",
+    "asset_current",
+    "asset_non_current",
+    "asset_prepayments",
+    "asset_fixed",
+    "liability_payable",
+    "liability_credit_card",
+    "liability_current",
+    "liability_non_current",
+    "equity",
+    "equity_unaffected",
+)
+
 
 class AerotecFiscalYearClose(models.Model):
     _name = "aerotec.fiscal.year.close"
@@ -49,6 +76,7 @@ class AerotecFiscalYearClose(models.Model):
         comodel_name="account.journal",
         string="Diario de Cierre",
         required=True,
+        default=lambda self: self.env.company.closing_journal_id,
         domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
         tracking=True,
     )
@@ -127,6 +155,18 @@ class AerotecFiscalYearClose(models.Model):
                     .next_by_code("aerotec.fiscal.year.close")
                     or "Nuevo"
                 )
+            if not vals.get("closing_journal_id"):
+                # El campo tiene un default basado en self.env.company, que
+                # sólo resuelve la empresa "activa" del usuario. En un alta
+                # multiempresa (p.ej. creación por código, importación, o
+                # cuando company_id difiere de la empresa activa) hay que
+                # resolver el diario contra la empresa propia del registro.
+                company = (
+                    self.env["res.company"].browse(vals["company_id"])
+                    if vals.get("company_id")
+                    else self.env.company
+                )
+                vals["closing_journal_id"] = company.closing_journal_id.id
         return super().create(vals_list)
 
     @api.onchange("company_id")
@@ -175,11 +215,12 @@ class AerotecFiscalYearClose(models.Model):
 
     def _close_income_expense_accounts(self):
         """
-        Debita/acredita las cuentas de resultado según sus prefijos configurados.
+        Debita/acredita las cuentas de resultado (income, income_other, expense,
+        expense_depreciation, expense_direct_cost) según su account_type.
         La diferencia neta va a la cuenta de Resultados del Ejercicio.
         """
-        balances = self._get_account_balances_by_prefix(
-            prefixes=self._get_prefixes("closing_result_prefixes", "4,5"),
+        balances = self._get_account_balances_by_type(
+            account_types=RESULT_ACCOUNT_TYPES,
             date_from=self.date_from,
             date_to=self.date_to,
         )
@@ -257,13 +298,14 @@ class AerotecFiscalYearClose(models.Model):
 
     def _close_balance_sheet_accounts(self):
         """
-        Lleva a cero las cuentas de activo, pasivo y patrimonio neto.
+        Lleva a cero las cuentas de activo, pasivo y patrimonio neto (incluye
+        equity_unaffected, donde suele acumularse el resultado del ejercicio).
         Cuentas con saldo deudor → se acreditan; con saldo acreedor → se debitan.
         La ecuación contable garantiza que el asiento cuadre.
         """
         # Saldos acumulados hasta date_to (incluye el asiento del paso 1)
-        balances = self._get_account_balances_by_prefix(
-            prefixes=self._get_prefixes("closing_balance_prefixes", "1,2,3"),
+        balances = self._get_account_balances_by_type(
+            account_types=BALANCE_ACCOUNT_TYPES,
             date_from=None,
             date_to=self.date_to,
         )
@@ -413,44 +455,20 @@ class AerotecFiscalYearClose(models.Model):
     # Helpers
     # -------------------------------------------------------------------------
 
-    def _get_prefixes(self, field_name, fallback):
-        """Devuelve la lista de prefijos configurados en la empresa para el campo indicado."""
-        raw = getattr(self.company_id, field_name, None) or fallback
-        prefixes = [p.strip() for p in raw.split(",") if p.strip()]
-        if not prefixes:
-            # Si la configuración queda vacía (p.ej. sólo comas/espacios), no se
-            # debe continuar sin filtro: eso incluiría cuentas de cualquier tipo
-            # (activo, pasivo, patrimonio) en el asiento de cierre.
-            raise UserError(
-                _("La configuración de prefijos de cuentas (%s) es inválida para %s.")
-                % (field_name, self.company_id.name)
-            )
-        return prefixes
-
-    def _get_account_balances_by_prefix(self, prefixes, date_from, date_to):
+    def _get_account_balances_by_type(self, account_types, date_from, date_to):
         """
-        Retorna un dict {account_record: balance} para las cuentas cuyos códigos
-        empiezan por alguno de los prefijos indicados.
+        Retorna un dict {account_record: balance} para las cuentas cuyo
+        account_type esté incluido en account_types.
         Si date_from es None, acumula desde el inicio de la historia contable.
         """
         domain = [
             ("company_id", "=", self.company_id.id),
             ("move_id.state", "=", "posted"),
             ("date", "<=", date_to),
+            ("account_id.account_type", "in", list(account_types)),
         ]
         if date_from:
             domain.append(("date", ">=", date_from))
-
-        # Filtro por prefijos de código de cuenta
-        if len(prefixes) == 1:
-            domain.append(("account_id.code", "=like", prefixes[0] + "%"))
-        else:
-            prefix_domain = []
-            for i, prefix in enumerate(prefixes):
-                if i > 0:
-                    prefix_domain.insert(0, "|")
-                prefix_domain.append(("account_id.code", "=like", prefix + "%"))
-            domain = domain + prefix_domain
 
         groups = (
             self.env["account.move.line"]
