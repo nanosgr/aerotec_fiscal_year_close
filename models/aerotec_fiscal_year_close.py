@@ -354,7 +354,7 @@ class AerotecFiscalYearClose(models.Model):
     # -------------------------------------------------------------------------
 
     def _lock_fiscal_year(self):
-        self.company_id.sudo().fiscalyear_lock_date = self.date_to
+        self._set_company_fiscalyear_lock_date(self.date_to)
 
     # -------------------------------------------------------------------------
     # Paso 4: Asiento de apertura del ejercicio siguiente
@@ -403,7 +403,7 @@ class AerotecFiscalYearClose(models.Model):
 
         # 1. Limpiar el lock primero para poder cancelar los asientos
         prev_lock = self._get_previous_lock_date()
-        self.company_id.sudo().fiscalyear_lock_date = prev_lock
+        self._set_company_fiscalyear_lock_date(prev_lock)
 
         # 2. Cancelar y eliminar asientos en orden inverso
         for move_fname in ("opening_move_id", "balance_move_id", "result_move_id"):
@@ -454,6 +454,71 @@ class AerotecFiscalYearClose(models.Model):
     # -------------------------------------------------------------------------
     # Helpers
     # -------------------------------------------------------------------------
+
+    def _set_company_fiscalyear_lock_date(self, lock_date):
+        """
+        Escribe ``fiscalyear_lock_date`` en la empresa preservando
+        ``l10n_ar_vat_computation_date`` de sus comprobantes de compra.
+
+        Ese campo (del módulo ``l10n_ar_vat_computation_date``) es
+        store=True/compute y depende de ``company_id.fiscalyear_lock_date``.
+        Al escribir el lock date, el ORM invalida y recalcula el campo para
+        TODOS los account.move de compra de la empresa -incluidos
+        comprobantes de ejercicios anteriores ya declarados ante AFIP/ARCA,
+        sin relación con este cierre-, pisando silenciosamente una fecha
+        que no debía volver a tocarse. Se toma una foto antes del cambio y,
+        si el ORM modificó algún valor, se restaura por SQL directo (sin
+        pasar de nuevo por write/compute) para que este módulo nunca sea la
+        causa de una modificación de ese campo.
+        """
+        AccountMove = self.env["account.move"]
+        protect_field = "l10n_ar_vat_computation_date" in AccountMove._fields
+
+        moves = AccountMove
+        original_values = {}
+        if protect_field:
+            moves = AccountMove.search(
+                [
+                    ("company_id", "=", self.company_id.id),
+                    ("move_type", "in", ("in_invoice", "in_refund")),
+                ]
+            )
+            original_values = {
+                move.id: move.l10n_ar_vat_computation_date for move in moves
+            }
+
+        self.company_id.sudo().fiscalyear_lock_date = lock_date
+
+        if not protect_field or not original_values:
+            return
+
+        moves.flush_recordset(["l10n_ar_vat_computation_date"])
+        to_restore = [
+            (move.id, original_values[move.id])
+            for move in moves
+            if move.l10n_ar_vat_computation_date != original_values[move.id]
+        ]
+        if not to_restore:
+            return
+
+        self.env.cr.execute_values(
+            """
+            UPDATE account_move AS move
+            SET l10n_ar_vat_computation_date = data.computation_date
+            FROM (VALUES %s) AS data(move_id, computation_date)
+            WHERE move.id = data.move_id
+            """,
+            to_restore,
+        )
+        AccountMove.invalidate_model(["l10n_ar_vat_computation_date"], flush=False)
+        _logger.info(
+            "Cierre %s: se preservaron %d fecha(s) de l10n_ar_vat_computation_date "
+            "que el bloqueo del ejercicio de %s intentó modificar (ids: %s).",
+            self.name,
+            len(to_restore),
+            self.company_id.name,
+            [move_id for move_id, _date in to_restore],
+        )
 
     def _get_account_balances_by_type(self, account_types, date_from, date_to):
         """
